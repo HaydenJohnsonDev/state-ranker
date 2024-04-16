@@ -20,27 +20,43 @@ interface State {
   cost: number;
   costal: boolean;
   averageTemp: number;
+  propertyTaxes: number;
+  propertyAppreciation: number;
+  populationPerSquareMile: number;
+  crimeRate: number;
+  education: number;
 }
 
 interface StateWithScore extends State {
   score: number;
 }
 
-const getColor = (value: number) => {
+const getColor = (value: number, flipColor?: boolean) => {
   const greenValue = 255 - Math.floor((value / 49) * 255);
   const redValue = Math.floor((value / 49) * 255);
 
-  return `rgb(${redValue}, ${greenValue}, 0)`;
+  return `rgb(${flipColor ? greenValue : redValue}, ${
+    flipColor ? redValue : greenValue
+  }, 0)`;
 };
 
-function OutOf50({ label, value, score }: Record<string, string | number>) {
+function Label({ label }: Record<string, string | number | boolean>) {
+  return <span className="font-bold">{label}: </span>;
+}
+
+function OutOf50({
+  label,
+  value,
+  score,
+  flipColor,
+}: Record<string, string | number | boolean>) {
   return (
     <div className="flex justify-between items-center">
       <p>
-        <span className="font-bold">{label}: </span>
+        <Label {...{ label }} />
         <span
           style={{
-            color: getColor(Number(value)),
+            color: getColor(Number(value), flipColor as boolean),
           }}
         >
           #{value}
@@ -60,10 +76,10 @@ function LabelAndValue({
   return (
     <div className="flex justify-between items-center">
       <p>
-        <span className="font-bold">{label}: </span>
+        <Label {...{ label }} />
         {value}
       </p>
-      <p>{score}</p>
+      <p>{(score as number).toFixed(2)}</p>
     </div>
   );
 }
@@ -73,7 +89,20 @@ const beautyParam = "prioritize-beauty";
 const costParam = "prioritize-cost";
 const conservativenessParam = "prioritize-conservativeness";
 const averageTempParam = "prioritize-average-temp";
+const propertyAppreciationParam = "prioritize-property-appreciation";
+const propertyTaxesParam = "prioritize-property-taxes";
+const populationPerSquareMileParam = "prioritize-population-density";
+const lowCrimeRateParam = "prioritize-low-crime";
+const educationParam = "Prioritize-education";
+
 const bestAverageTempParam = "best-average-temp";
+const bestPopulationPerSquareMileParam = "best-population-density";
+
+const prioritizeMultiplier = 2;
+const defaultMultiplier = 1;
+const notPrioritizeMultiplier = 0.5;
+
+const minimum = -1;
 
 export default function Home() {
   const pathname = usePathname();
@@ -89,23 +118,111 @@ export default function Home() {
     searchParams.get(conservativenessParam)?.toString() === "true";
   const averageTempPrioritized =
     searchParams.get(averageTempParam)?.toString() === "true";
+  const propertyAppreciationPrioritized =
+    searchParams.get(propertyAppreciationParam)?.toString() === "true";
+  const propertyTaxesPrioritized =
+    searchParams.get(propertyTaxesParam)?.toString() === "true";
+  const populationDensityPrioritized =
+    searchParams.get(populationPerSquareMileParam)?.toString() === "true";
+  const lowCrimeRatePrioritized =
+    searchParams.get(lowCrimeRateParam)?.toString() === "true";
+  const educationPrioritized =
+    searchParams.get(educationParam)?.toString() === "true";
+
+  const prioritizing =
+    costPrioritized ||
+    beautyPrioritized ||
+    conservativenessPrioritized ||
+    averageTempPrioritized ||
+    costalPrioritized ||
+    propertyAppreciationPrioritized ||
+    propertyTaxesPrioritized ||
+    populationDensityPrioritized ||
+    lowCrimeRatePrioritized ||
+    educationPrioritized;
+
   const bestAverageTemp =
     Number(searchParams.get(bestAverageTempParam)?.toString()) || 55;
+  const bestPopulationPerSquareMile =
+    Number(searchParams.get(bestPopulationPerSquareMileParam)?.toString()) ||
+    50;
 
   const [statesSorted, setStatesSorted] = useState<StateWithScore[]>([]);
+  const [rankedByAppreciation, setRankedByAppreciation] = useState<State[]>([]);
 
   const flipHigher = (value: number) => 50 - value;
+  const min = (value: number) => (value > minimum ? value : minimum);
 
+  const getValueScore = (value: number, prioritize: boolean) =>
+    value *
+    (prioritize
+      ? prioritizeMultiplier
+      : prioritizing
+      ? notPrioritizeMultiplier
+      : defaultMultiplier);
   const getFlippedValueScore = (value: number, prioritize: boolean) =>
-    flipHigher(value) * (prioritize ? 2 : 1);
+    flipHigher(value) *
+    (prioritize
+      ? prioritizeMultiplier
+      : prioritizing
+      ? notPrioritizeMultiplier
+      : defaultMultiplier);
   const getAverageTempScore = (value: number) =>
     flipHigher(Math.abs(value - bestAverageTemp)) *
-    (averageTempPrioritized ? 2 : 1);
+    (averageTempPrioritized
+      ? prioritizeMultiplier
+      : prioritizing
+      ? notPrioritizeMultiplier
+      : defaultMultiplier);
+  const getPopulationPerSquareMileScore = (value: number) =>
+    min(flipHigher(Math.abs(value - bestPopulationPerSquareMile))) *
+    (populationDensityPrioritized
+      ? prioritizeMultiplier
+      : prioritizing
+      ? notPrioritizeMultiplier
+      : defaultMultiplier);
   const getCostalScore = (value: boolean) =>
-    (value ? 50 : 25) * (costalPrioritized ? 2 : 1);
+    (value ? 25 : 0) *
+    (costalPrioritized
+      ? prioritizeMultiplier
+      : prioritizing
+      ? notPrioritizeMultiplier
+      : defaultMultiplier);
 
   const getScore = (state: State) => {
-    const { cost, beauty, conservative, averageTemp, costal } = state;
+    const {
+      stateName,
+      cost,
+      beauty,
+      conservative,
+      averageTemp,
+      costal,
+      propertyTaxes,
+      populationPerSquareMile,
+      crimeRate,
+      education,
+    } = state;
+
+    const educationScore = getFlippedValueScore(
+      education,
+      educationPrioritized
+    );
+    const populationPerSquareMileScore = getPopulationPerSquareMileScore(
+      populationPerSquareMile
+    );
+    let place = 0;
+    rankedByAppreciation.forEach((ranked, index) => {
+      if (ranked.stateName === stateName) place = index;
+    });
+    const propertyAppreciationScore = getFlippedValueScore(
+      place,
+      propertyAppreciationPrioritized
+    );
+    const crimeScore = getValueScore(crimeRate, lowCrimeRatePrioritized);
+    const propertyTaxesScore = getFlippedValueScore(
+      propertyTaxes,
+      propertyTaxesPrioritized
+    );
     const costScore = getFlippedValueScore(cost, costPrioritized);
     const beautyScore = getFlippedValueScore(beauty, beautyPrioritized);
     const conservativeScore = getFlippedValueScore(
@@ -125,7 +242,12 @@ export default function Home() {
       beautyScore +
       conservativeScore +
       averageTempScore +
-      costalScore
+      costalScore +
+      educationScore +
+      populationPerSquareMileScore +
+      crimeScore +
+      propertyTaxesScore +
+      propertyAppreciationScore
     );
   };
 
@@ -147,7 +269,21 @@ export default function Home() {
     averageTempPrioritized,
     costalPrioritized,
     bestAverageTemp,
+    propertyAppreciationPrioritized,
+    propertyTaxesPrioritized,
+    lowCrimeRatePrioritized,
+    educationPrioritized,
+    populationDensityPrioritized,
   ]);
+
+  useEffect(() => {
+    const fake = states.map((state) => state);
+    const sortedByApp = fake.sort((a, b) =>
+      a.propertyAppreciation > b.propertyAppreciation ? -1 : 1
+    );
+
+    setRankedByAppreciation(sortedByApp);
+  }, [states]);
 
   function handleChange(param: string, value: boolean | string) {
     const params = new URLSearchParams(searchParams);
@@ -174,17 +310,68 @@ export default function Home() {
             score.
           </p>
         </div>
+        <Label label="Cultural" />
         <Checkbox
-          defaultSelected={costalPrioritized}
-          onValueChange={(e) => handleChange(costalParam, e)}
+          defaultSelected={conservativenessPrioritized}
+          onValueChange={(e) => handleChange(conservativenessParam, e)}
         >
-          Costal States
+          Conservativeness (Based on 2020 voter data)
         </Checkbox>
+        <Checkbox
+          defaultSelected={lowCrimeRatePrioritized}
+          onValueChange={(e) => handleChange(lowCrimeRateParam, e)}
+        >
+          Low Crime
+        </Checkbox>
+        <Checkbox
+          defaultSelected={educationPrioritized}
+          onValueChange={(e) => handleChange(educationParam, e)}
+        >
+          Education
+        </Checkbox>
+        <Checkbox
+          defaultSelected={populationDensityPrioritized}
+          onValueChange={(e) => handleChange(populationPerSquareMileParam, e)}
+        >
+          Population Density
+        </Checkbox>
+        <div className="max-w-80">
+          <Input
+            min={20}
+            max={80}
+            type="number"
+            defaultValue={bestPopulationPerSquareMile.toString()}
+            onValueChange={(e) =>
+              handleChange(bestPopulationPerSquareMileParam, e)
+            }
+            label="What is the best population/square mile?"
+          />
+        </div>
+        <Label label="Economical" />
         <Checkbox
           defaultSelected={costPrioritized}
           onValueChange={(e) => handleChange(costParam, e)}
         >
           Low Housing Cost
+        </Checkbox>
+        <Checkbox
+          defaultSelected={propertyAppreciationPrioritized}
+          onValueChange={(e) => handleChange(propertyAppreciationParam, e)}
+        >
+          High Property Appreciation
+        </Checkbox>
+        <Checkbox
+          defaultSelected={propertyTaxesPrioritized}
+          onValueChange={(e) => handleChange(propertyTaxesParam, e)}
+        >
+          Low Property Taxes
+        </Checkbox>
+        <Label label="Aesthetics" />
+        <Checkbox
+          defaultSelected={costalPrioritized}
+          onValueChange={(e) => handleChange(costalParam, e)}
+        >
+          Costal States
         </Checkbox>
         <Checkbox
           defaultSelected={beautyPrioritized}
@@ -193,18 +380,12 @@ export default function Home() {
           Natural Beauty
         </Checkbox>
         <Checkbox
-          defaultSelected={conservativenessPrioritized}
-          onValueChange={(e) => handleChange(conservativenessParam, e)}
-        >
-          Conservativeness (Based on 2020 voter data)
-        </Checkbox>
-        <Checkbox
           defaultSelected={averageTempPrioritized}
           onValueChange={(e) => handleChange(averageTempParam, e)}
         >
           Average Temperate (Fahrenheit)
         </Checkbox>
-        <div className="max-w-64">
+        <div className="max-w-80">
           <Input
             min={20}
             max={80}
@@ -235,68 +416,139 @@ export default function Home() {
                 averageTemp,
                 beauty,
                 score,
+                crimeRate,
+                education,
+                populationPerSquareMile,
+                propertyTaxes,
+                propertyAppreciation,
               },
               index
-            ) => (
-              <Card key={stateName} className="bg-zinc-800">
-                <CardHeader className="flex justify-between items-center">
-                  <h2
-                    className="truncate"
-                    style={{
-                      color: getColor(index),
-                    }}
-                  >
-                    {stateName}
-                  </h2>
-                  <h3
-                    className="truncate"
-                    style={{
-                      color: getColor(index),
-                    }}
-                  >
-                    {score.toFixed(2)}
-                  </h3>
-                </CardHeader>
-                <Divider />
-                <CardBody>
-                  <OutOf50
-                    label="Conservativeness"
-                    value={conservative}
-                    score={getFlippedValueScore(
-                      conservative,
-                      conservativenessPrioritized
-                    )}
-                  />
-                  <OutOf50
-                    label="Housing Cost"
-                    value={cost}
-                    score={getFlippedValueScore(cost, costPrioritized)}
-                  />
-                  <div className="my-2" />
-                  <div className="flex justify-between items-center">
+            ) => {
+              let place = 0;
+              rankedByAppreciation.forEach((ranked, index) => {
+                if (ranked.stateName === stateName) place = index;
+              });
+              const appreciationColor = getColor(place);
+              return (
+                <Card key={stateName} className="bg-zinc-800">
+                  <CardHeader className="flex justify-between items-center">
+                    <h2
+                      className="truncate"
+                      style={{
+                        color: getColor(index),
+                      }}
+                    >
+                      {stateName}
+                    </h2>
+                    <h3
+                      className="truncate"
+                      style={{
+                        color: getColor(index),
+                      }}
+                    >
+                      #{index + 1}
+                    </h3>
+                  </CardHeader>
+                  <Divider />
+                  <CardBody>
+                    <Label label="Cultural" />
+                    <OutOf50
+                      label="Conservativeness"
+                      value={conservative}
+                      score={getFlippedValueScore(
+                        conservative,
+                        conservativenessPrioritized
+                      )}
+                    />
+                    <OutOf50
+                      label="High Crime (Lower value is better)"
+                      value={crimeRate}
+                      score={getValueScore(crimeRate, lowCrimeRatePrioritized)}
+                      flipColor
+                    />
+                    <OutOf50
+                      label="Education"
+                      value={education}
+                      score={getFlippedValueScore(
+                        education,
+                        educationPrioritized
+                      )}
+                    />
+                    <LabelAndValue
+                      label="Population Density"
+                      value={populationPerSquareMile}
+                      score={getPopulationPerSquareMileScore(
+                        populationPerSquareMile
+                      )}
+                    />
+                    <div className="my-2" />
+                    <Label label="Economical" />
+                    <OutOf50
+                      label="Housing Cost"
+                      value={cost}
+                      score={getFlippedValueScore(cost, costPrioritized)}
+                    />
+                    <div className="flex justify-between items-center">
+                      <p>
+                        <span className="font-bold">
+                          Property Appreciation:{" "}
+                        </span>
+                        <span
+                          style={{
+                            color: appreciationColor,
+                          }}
+                        >
+                          {`${propertyAppreciation}%`}
+                        </span>
+                      </p>
+                      <p>
+                        {getFlippedValueScore(
+                          place,
+                          propertyAppreciationPrioritized
+                        )}
+                      </p>
+                    </div>
+                    <OutOf50
+                      label="Low Property Taxes"
+                      value={propertyTaxes}
+                      score={getFlippedValueScore(
+                        propertyTaxes,
+                        propertyTaxesPrioritized
+                      )}
+                    />
+                    <div className="my-2" />
+                    <Label label="Aesthetics" />
+                    <div className="flex justify-between items-center">
+                      <p>
+                        <span className="font-bold">Is on the coast: </span>
+                        <span
+                          className={costal ? "text-blue-500" : "text-red-600"}
+                        >
+                          {costal.toString()}
+                        </span>
+                      </p>
+                      <p>{getCostalScore(costal)}</p>
+                    </div>
+                    <OutOf50
+                      label="Natural Beauty"
+                      value={beauty}
+                      score={getFlippedValueScore(beauty, beautyPrioritized)}
+                    />
+                    <LabelAndValue
+                      label="Average Temperature (Fahrenheit)"
+                      value={averageTemp}
+                      score={getAverageTempScore(averageTemp)}
+                    />
+                  </CardBody>
+                  <CardFooter className="flex justify-end items-center">
                     <p>
-                      <span className="font-bold">Is on the coast: </span>
-                      <span
-                        className={costal ? "text-blue-500" : "text-red-600"}
-                      >
-                        {costal.toString()}
-                      </span>
+                      <Label label="Total Score" />
+                      {score.toFixed(2)}
                     </p>
-                    <p>{getCostalScore(costal)}</p>
-                  </div>
-                  <OutOf50
-                    label="Natural Beauty"
-                    value={beauty}
-                    score={getFlippedValueScore(beauty, beautyPrioritized)}
-                  />
-                  <LabelAndValue
-                    label="Average Temperature (Fahrenheit)"
-                    value={averageTemp}
-                    score={getAverageTempScore(averageTemp)}
-                  />
-                </CardBody>
-              </Card>
-            )
+                  </CardFooter>
+                </Card>
+              );
+            }
           )}
         </div>
       </div>

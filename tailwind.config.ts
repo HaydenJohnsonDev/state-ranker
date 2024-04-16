@@ -34,9 +34,9 @@ const config: Config = {
         dark: {
           colors: {
             background: "#171717",
-            foreground: "#f5f5f5",
+            foreground: "#a3a3a3",
             primary: {
-              foreground: "#FFFFFF",
+              foreground: "#a3a3a3",
               DEFAULT: "#006FEE",
             },
           },
